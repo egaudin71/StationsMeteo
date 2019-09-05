@@ -243,7 +243,7 @@ void loop(void)
     clocktick( date_jrs, date_hrs, date_min, date_sec);
     sprintf(unit_time, "%02d:%02d:%02d", date_hrs, date_min, date_sec);
 
-    getsound();
+    getsound();// microphone
 
     sensors.requestTemperatures(); // Send the command to get temperatures
     for (byte i = 0; i < nbsensors; i++) {

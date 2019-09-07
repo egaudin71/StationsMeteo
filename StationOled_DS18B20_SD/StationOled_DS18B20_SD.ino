@@ -35,7 +35,8 @@ long nbEnreg = 0;
 char FileSD[] = "REC01.txt";
 
 int micro = A0;
-int sound ;
+float sound = 0;
+float sound2 = 0;
 
 const char *string_list_var =
   "Temp 1\n"
@@ -88,15 +89,19 @@ void draw(float value, byte index = 0)
 void getsound()
 //================================================
 {
-  sound = analogRead(micro);
-  sound +=analogRead(micro);
-  sound +=analogRead(micro);
-  sound +=analogRead(micro);
-  sound +=analogRead(micro);
-  sound +=analogRead(micro);
-  sound +=analogRead(micro);
-  sound +=analogRead(micro);
-  sound >>3; // moyenne
+   int a = 0;
+  
+  a = analogRead(micro);
+  
+  sound = a; sound2 = a*a;
+ a = analogRead(micro);
+  sound += a; sound2 += a*a;
+ a = analogRead(micro);
+  sound += a; sound2 += a*a;
+ a = analogRead(micro);
+  sound += a; sound2 += a*a;
+  sound /=4; // moyennedivision par 4
+   sound2 /=4;// moyennedivision par 4
 }
 
 //================================================
@@ -217,7 +222,7 @@ void setup(void)
     FileSD[4] = index % 10 + 48;
     index++;
   }
-
+date_min = 0;
   //Serial.println("initialization done.");
 }
 
@@ -230,7 +235,6 @@ void loop(void)
 {
   unsigned long currenttime = millis();
   float temp[3];
-//  int sound;
   int8_t bouton = u8g2.getMenuEvent();
   byte cardOK = digitalRead(PINCARD);
 
@@ -253,10 +257,10 @@ void loop(void)
     String txtsd = unit_time;
     txtsd = txtsd + "," + printfloat2char(temp[0]) ;
     txtsd = txtsd + "," + printfloat2char(temp[1]) ;
-    txtsd = txtsd + "," + printint2char(sound) ;
+    txtsd = txtsd + "," + printfloat2char(sound) ;
 
 
-    if ( (date_min >= (lastminute+1 ) )) {// toutes les 2 minutes
+    if ( (date_min != lastminute)&&(date_min % 2==0)) {// toutes les 1 minutes
       lastminute = date_min;
 
       if ((cartepresente == 0) && (cardOK == HIGH)) { // la carte avait ete enlevee, elle est remise
@@ -287,7 +291,7 @@ void loop(void)
         draw(temp[current_selection - 1], current_selection);
       }
       else if (current_selection == 3) {
-        draw(sound, current_selection);        
+        draw(sound2, current_selection);        
       }
       else if (current_selection == 5) {
         u8g2.setFont(u8g2_font_6x12_tr);
@@ -315,7 +319,7 @@ void loop(void)
         u8g2.setFontPosTop();
         u8g2.drawStr( 0, 0, printfloat2char(temp[0]));
         u8g2.drawStr(64, 0, printfloat2char(temp[1]));
-        u8g2.drawStr( 0, 12, printint2char(sound));
+        u8g2.drawStr( 0, 12,printfloat2char(sound));
         u8g2.drawStr(0, 20, unit_time);
         char txt[] = "Enreg#######";
         sprintf(txt, "Enreg# %d", nbEnreg);

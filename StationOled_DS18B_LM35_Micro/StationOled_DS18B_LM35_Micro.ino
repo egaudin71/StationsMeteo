@@ -15,6 +15,8 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
 U8G2_SSD1306_128X64_NONAME_1_SW_I2C u8g2(U8G2_R0, SCL, SDA, U8X8_PIN_NONE);   // All Boards without Reset of the Display
+#define BUTTON_NEXT 3
+#define BUTTON_SELECT 4
 #define HEIGHT     64
 #define WIDTH      128
 #define debounce  250
@@ -35,25 +37,31 @@ long nbEnreg = 0;
 char FileSD[] = "REC01.txt";
 
 const int micro = A0;
-float sound = 0;
-float sound2 = 0;
+
 float tempLM35 = 0;
+const char *string_list_var_0 =
+  "LM35 \n"
+  "Synth \n"
+  "Sleep \n"
+  "File";
 const char *string_list_var_1 =
   "Temp 1\n"
   "LM35 \n"
   "Synth \n"
+  "Sleep \n"
   "File";
 const char *string_list_var_2 =
   "Temp 1\n"
   "Temp 2\n"
   "LM35 \n"
   "Synth \n"
+  "Sleep \n"
   "File";
 
 //----------------------- graphique et page
 volatile byte page = 0;
 volatile bool cartepresente = 0;
-uint8_t current_selection = 4;
+uint8_t current_selection = 3;
 
 //================================================
 void change_page()
@@ -193,7 +201,7 @@ void setup(void)
   }
 
   //----------------------------------------- boutons du graphique
-  u8g2.begin(/*Select=*/ 4, /*Right/Next=*/ 3, /*Left/Prev=*/ U8X8_PIN_NONE, /*Up=*/ U8X8_PIN_NONE, /*Down=*/ U8X8_PIN_NONE, /*Home/Cancel=*/ U8X8_PIN_NONE);
+  u8g2.begin(/*Select=*/ BUTTON_SELECT, /*Right/Next=*/ BUTTON_NEXT, /*Left/Prev=*/ U8X8_PIN_NONE, /*Up=*/ U8X8_PIN_NONE, /*Down=*/ U8X8_PIN_NONE, /*Home/Cancel=*/ U8X8_PIN_NONE);
   u8g2.setFontRefHeightExtendedText();
   u8g2.setDrawColor(1);
   u8g2.setFontPosTop();
@@ -242,6 +250,7 @@ void loop(void)
     sprintf(unit_time, "%02d:%02d:%02d", date_hrs, date_min, date_sec);
 
     gettempLM35();
+
     sensors.requestTemperatures(); // Send the command to get temperatures
     for (byte i = 0; i < nbsensors; i++) {
       temp[i] = sensors.getTempC(AddressSensors[i]);
@@ -272,11 +281,18 @@ void loop(void)
   if (page == 1) {
     //-------------------------- Page des MENUS
     u8g2.setFont(u8g2_font_6x12_tr);
-    if (nbsensors == 2) {
-      current_selection = u8g2.userInterfaceSelectionList("Mesures", current_selection, string_list_var_2);
-    }
-    if (nbsensors == 1) {
-      current_selection = u8g2.userInterfaceSelectionList("Mesures", current_selection, string_list_var_1);
+    switch (nbsensors) {
+      case 0:
+        current_selection = u8g2.userInterfaceSelectionList("Mesures", current_selection, string_list_var_0);
+        break;
+      case 1:
+        current_selection = u8g2.userInterfaceSelectionList("Mesures", current_selection, string_list_var_1);
+        break;
+      case 2:
+        current_selection = u8g2.userInterfaceSelectionList("Mesures", current_selection, string_list_var_2);
+        break;
+      default:
+        break;
     }
     page = 0;
   }
@@ -284,14 +300,38 @@ void loop(void)
     // picture loop
     u8g2.firstPage();
     do {
-      if (current_selection < nbsensors) {
+      if (current_selection <= nbsensors) {
         //--------------------------------- page de chaque CAPTEUR
-        draw(temp[current_selection], current_selection);
+        draw(temp[current_selection - 1 ], current_selection);
       }
-      else if (current_selection == nbsensors) {
-        draw(sound2, current_selection);
+      else if (current_selection == nbsensors + 1) {
+        draw(tempLM35, current_selection);
       }
       else if (current_selection == nbsensors + 2) {
+        u8g2.setFont(u8g2_font_6x12_tr);
+        u8g2.setFontPosTop();
+        u8g2.drawStr( 0, 0, printfloat2char(temp[0]));
+        if (nbsensors == 2) {
+          u8g2.drawStr(64, 0, printfloat2char(temp[1]));
+        }
+        u8g2.drawStr( 0, 12, printfloat2char(tempLM35));
+        u8g2.drawStr(0, 20, unit_time);
+        char txt[] = "Enreg#######";
+        sprintf(txt, "Enreg# %d", nbEnreg);
+        u8g2.drawStr(0, 30, txt);
+
+        u8g2.drawStr(0, 40, FileSD);
+
+        byte cardOK = digitalRead(PINCARD);
+        u8g2.drawStr(30, 52, (cardOK == LOW) ? "No CARD !" : "Card OK");
+        if (cartepresente == 0) {
+          u8g2.drawStr(50, 50, "/!\\ init");
+        }
+      }
+      else if (current_selection == nbsensors + 3){
+        u8g2.drawStr(0, 0, "");
+      }
+      else {
         u8g2.setFont(u8g2_font_6x12_tr);
         u8g2.setFontPosTop();
         u8g2.drawStr( 0, 0, "FICHIER");
@@ -312,25 +352,7 @@ void loop(void)
           fichier.close();
         }
       }
-      else  {
-        u8g2.setFont(u8g2_font_6x12_tr);
-        u8g2.setFontPosTop();
-        u8g2.drawStr( 0, 0, printfloat2char(temp[0]));
-        //        u8g2.drawStr(64, 0, printfloat2char(temp[1]));
-        u8g2.drawStr( 0, 12, printfloat2char(tempLM35));
-        u8g2.drawStr(0, 20, unit_time);
-        char txt[] = "Enreg#######";
-        sprintf(txt, "Enreg# %d", nbEnreg);
-        u8g2.drawStr(0, 30, txt);
 
-        u8g2.drawStr(0, 40, FileSD);
-
-        byte cardOK = digitalRead(PINCARD);
-        u8g2.drawStr(30, 52, (cardOK == LOW) ? "No CARD !" : "Card OK");
-        if (cartepresente == 0) {
-          u8g2.drawStr(50, 50, "/!\\ init");
-        }
-      }
     } while ( u8g2.nextPage() );
   }
 

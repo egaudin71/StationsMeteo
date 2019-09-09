@@ -38,10 +38,15 @@ const int micro = A0;
 float sound = 0;
 float sound2 = 0;
 float tempLM35 = 0;
-const char *string_list_var =
+const char *string_list_var_1 =
+  "Temp 1\n"
+  "LM35 \n"
+  "Synth \n"
+  "File";
+const char *string_list_var_2 =
   "Temp 1\n"
   "Temp 2\n"
-  "Micro \n"
+  "LM35 \n"
   "Synth \n"
   "File";
 
@@ -85,32 +90,12 @@ void draw(float value, byte index = 0)
   u8g2.drawStr(0, 50, unit_time);
 }
 
-
-//================================================
-void getsound()
-//================================================
-{
-   int a = 0;
-  
-  a = analogRead(micro);
-  
-  sound = a; sound2 = a*a;
- a = analogRead(micro);
-  sound += a; sound2 += a*a;
- a = analogRead(micro);
-  sound += a; sound2 += a*a;
- a = analogRead(micro);
-  sound += a; sound2 += a*a;
-  sound /=4; // moyennedivision par 4
-   sound2 /=4;// moyennedivision par 4
-}
-
 //================================================
 void gettempLM35()
 //================================================
 {
-  tempLM35 = (float)(analogRead(micro))/1024*5000;
-  tempLM35 /=10.0; // conversion mill en °C
+  tempLM35 = (float)(analogRead(micro)) / 1024 * 5000;
+  tempLM35 /= 10.0; // conversion mill en °C
 }
 
 //================================================
@@ -231,7 +216,7 @@ void setup(void)
     FileSD[4] = index % 10 + 48;
     index++;
   }
-date_min = 0;
+  date_min = 0;
   //Serial.println("initialization done.");
 }
 
@@ -256,8 +241,7 @@ void loop(void)
     clocktick( date_jrs, date_hrs, date_min, date_sec);
     sprintf(unit_time, "%02d:%02d:%02d", date_hrs, date_min, date_sec);
 
-    //getsound();// microphone
-  gettempLM35();
+    gettempLM35();
     sensors.requestTemperatures(); // Send the command to get temperatures
     for (byte i = 0; i < nbsensors; i++) {
       temp[i] = sensors.getTempC(AddressSensors[i]);
@@ -265,11 +249,11 @@ void loop(void)
 
     String txtsd = unit_time;
     txtsd = txtsd + "," + printfloat2char(temp[0]) ;
-//    txtsd = txtsd + "," + printfloat2char(temp[1]) ;
+    //    txtsd = txtsd + "," + printfloat2char(temp[1]) ;
     txtsd = txtsd + "," + printfloat2char(tempLM35) ;
 
 
-    if ( (date_min != lastminute)&&(date_min % 2==0)) {// toutes les 1 minutes
+    if ( (date_min != lastminute) && (date_min % 2 == 0)) { // toutes les 1 minutes
       lastminute = date_min;
 
       if ((cartepresente == 0) && (cardOK == HIGH)) { // la carte avait ete enlevee, elle est remise
@@ -288,21 +272,26 @@ void loop(void)
   if (page == 1) {
     //-------------------------- Page des MENUS
     u8g2.setFont(u8g2_font_6x12_tr);
-    current_selection = u8g2.userInterfaceSelectionList("Mesures", current_selection, string_list_var);
+    if (nbsensors == 2) {
+      current_selection = u8g2.userInterfaceSelectionList("Mesures", current_selection, string_list_var_2);
+    }
+    if (nbsensors == 1) {
+      current_selection = u8g2.userInterfaceSelectionList("Mesures", current_selection, string_list_var_1);
+    }
     page = 0;
   }
   else {
     // picture loop
     u8g2.firstPage();
     do {
-      if (current_selection < 2) {
+      if (current_selection < nbsensors) {
         //--------------------------------- page de chaque CAPTEUR
-        draw(temp[current_selection - 1], current_selection);
+        draw(temp[current_selection], current_selection);
       }
-      else if (current_selection == 3) {
-        draw(sound2, current_selection);        
+      else if (current_selection == nbsensors) {
+        draw(sound2, current_selection);
       }
-      else if (current_selection == 5) {
+      else if (current_selection == nbsensors + 2) {
         u8g2.setFont(u8g2_font_6x12_tr);
         u8g2.setFontPosTop();
         u8g2.drawStr( 0, 0, "FICHIER");
@@ -327,8 +316,8 @@ void loop(void)
         u8g2.setFont(u8g2_font_6x12_tr);
         u8g2.setFontPosTop();
         u8g2.drawStr( 0, 0, printfloat2char(temp[0]));
-//        u8g2.drawStr(64, 0, printfloat2char(temp[1]));
-        u8g2.drawStr( 0, 12,printfloat2char(tempLM35));
+        //        u8g2.drawStr(64, 0, printfloat2char(temp[1]));
+        u8g2.drawStr( 0, 12, printfloat2char(tempLM35));
         u8g2.drawStr(0, 20, unit_time);
         char txt[] = "Enreg#######";
         sprintf(txt, "Enreg# %d", nbEnreg);
@@ -339,7 +328,7 @@ void loop(void)
         byte cardOK = digitalRead(PINCARD);
         u8g2.drawStr(30, 52, (cardOK == LOW) ? "No CARD !" : "Card OK");
         if (cartepresente == 0) {
-          u8g2.drawStr(50, 40, "/!\\ init");
+          u8g2.drawStr(50, 50, "/!\\ init");
         }
       }
     } while ( u8g2.nextPage() );

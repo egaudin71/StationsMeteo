@@ -34,7 +34,7 @@ byte index = 0;
 long nbEnreg = 0;
 char FileSD[] = "REC01.txt";
 
-int micro = A0;
+const int micro = A0;
 float sound = 0;
 float sound2 = 0;
 float tempLM35 = 0;

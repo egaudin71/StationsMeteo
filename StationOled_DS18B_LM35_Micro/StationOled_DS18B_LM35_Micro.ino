@@ -61,7 +61,7 @@ const char *string_list_var_2 =
 //----------------------- graphique et page
 volatile byte page = 0;
 volatile bool cartepresente = 0;
-uint8_t current_selection = 3;
+uint8_t current_selection = 2;
 
 //================================================
 void change_page()
@@ -102,7 +102,7 @@ void draw(float value, byte index = 0)
 void gettempLM35()
 //================================================
 {
-  tempLM35 = (float)(analogRead(micro)) / 1024 * 5000;
+  tempLM35 = (float)(analogRead(micro)) / 1023 * 3300;
   tempLM35 /= 10.0; // conversion mill en °C
 }
 

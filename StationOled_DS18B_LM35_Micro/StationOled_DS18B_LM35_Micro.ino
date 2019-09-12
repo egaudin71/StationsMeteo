@@ -1,14 +1,12 @@
 #include <U8g2lib.h>
 #include <SdFat.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
+//#include <OneWire.h>
+//#include <DallasTemperature.h>
 
-//#include <Wire.h>
-//#include <TimeLib.h>
-//#include "uRTCLib.h"
-//#include "Arduino.h"
-//#include <DS1307RTC.h>
+#include <Wire.h>
+#include "RTClib.h"
 
+DS1307 rtc;
 
 //----------------Carte SD
 SdFat sd;
@@ -19,10 +17,11 @@ SdFat sd;
 // Data wire is plugged into port 2 on the Arduino
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 // Pass our oneWire reference to Dallas Temperature.
+/*
 #define ONE_WIRE_BUS 2
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
-
+*/
 //---------------- OLED SCREEN
 U8G2_SSD1306_128X64_NONAME_1_SW_I2C u8g2(U8G2_R0, SCL, SDA, U8X8_PIN_NONE);   // All Boards without Reset of the Display
 #define BUTTON_NEXT 3
@@ -33,6 +32,7 @@ U8G2_SSD1306_128X64_NONAME_1_SW_I2C u8g2(U8G2_R0, SCL, SDA, U8X8_PIN_NONE);   //
 
 //---------------- RTS MODULE
 //uRTCLib rtc(0x68);
+//tmElements_t tm;
 
 /*
   const char *monthName[12] = {
@@ -52,7 +52,7 @@ byte lastminute;
 char unit_time[] = "23:59:59";
 
 byte nbsensors = 0; // nb de capteurs detectes
-DeviceAddress AddressSensors[1];
+//DeviceAddress AddressSensors[1];
 byte index = 0;
 long nbEnreg = 0;
 char FileSD[] = "REC01.txt";
@@ -215,12 +215,12 @@ void setup(void)
   //Serial.begin(9600);
 
   //----------------------------------------- detection du nombre de capteurs
-  sensors.begin();
+/*  sensors.begin();
   nbsensors = sensors.getDeviceCount();
   for (byte i = 0; i < nbsensors; i++) {
     sensors.getAddress(AddressSensors[i], i);
   }
-
+*/
   //----------------------------------------- boutons du graphique
   u8g2.begin(/*Select=*/ BUTTON_SELECT, /*Right/Next=*/ BUTTON_NEXT, /*Left/Prev=*/ U8X8_PIN_NONE, /*Up=*/ U8X8_PIN_NONE, /*Down=*/ U8X8_PIN_NONE, /*Home/Cancel=*/ U8X8_PIN_NONE);
   u8g2.setFontRefHeightExtendedText();
@@ -247,9 +247,20 @@ void setup(void)
   }
   date_min = 0;
   //Serial.println("initialization done.");
-//      Wire.begin();
+//delay (2000);
+  bool parse=false;
+  bool config=false;
 
-//  rtc.set(0, 42, 16, 6, 2, 5, 15);
+  // get the date and time the compiler was run
+/*  if (getDate(__DATE__) && getTime(__TIME__)) {
+    parse = true;
+    // and configure the RTC with this info
+    if (RTC.write(tm)) {
+      config = true;
+    }
+  }
+*/
+delay (200);
 
 }
 
@@ -273,9 +284,9 @@ void loop(void)
     lasttime = currenttime;
     clocktick( date_jrs, date_hrs, date_min, date_sec);
     sprintf(unit_time, "%02d:%02d:%02d", date_hrs, date_min, date_sec);
-  /*rtc.refresh();
-       sprintf(unit_time, "%02d:%02d:%02d", rtc.hour(), rtc.minute(), rtc.second());
-*/
+  if (RTC.read(tm)) {
+       sprintf(unit_time, "%02d:%02d:%02d", 10, 20, 30);
+  }
     /*
       tmElements_t tm;
       if (RTC.read(tm)) {
@@ -293,11 +304,11 @@ void loop(void)
     */
     gettempLM35();
 
-    sensors.requestTemperatures(); // Send the command to get temperatures
+ /*   sensors.requestTemperatures(); // Send the command to get temperatures
     for (byte i = 0; i < nbsensors; i++) {
       temp[i] = sensors.getTempC(AddressSensors[i]);
     }
-
+*/
     String txtsd = unit_time;
     txtsd = txtsd + "," + printfloat2char(temp[0]) ;
     //    txtsd = txtsd + "," + printfloat2char(temp[1]) ;

@@ -3,10 +3,19 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
+//#include <Wire.h>
+//#include <TimeLib.h>
+//#include "uRTCLib.h"
+//#include "Arduino.h"
+//#include <DS1307RTC.h>
+
+
+//----------------Carte SD
 SdFat sd;
 #define PINSD 10  //pin de l'Arduino reliee au CS du module SD
 #define PINCARD 7  //pin de l'Arduino reliee au CS du module SD
 
+//---------------- DALLAS SENSOR
 // Data wire is plugged into port 2 on the Arduino
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 // Pass our oneWire reference to Dallas Temperature.
@@ -14,12 +23,24 @@ SdFat sd;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
+//---------------- OLED SCREEN
 U8G2_SSD1306_128X64_NONAME_1_SW_I2C u8g2(U8G2_R0, SCL, SDA, U8X8_PIN_NONE);   // All Boards without Reset of the Display
 #define BUTTON_NEXT 3
 #define BUTTON_SELECT 4
 #define HEIGHT     64
 #define WIDTH      128
 #define debounce  250
+
+//---------------- RTS MODULE
+//uRTCLib rtc(0x68);
+
+/*
+  const char *monthName[12] = {
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  };
+*/
+
 
 byte date_sec = 0;
 byte date_min = 0;
@@ -102,7 +123,7 @@ void draw(float value, byte index = 0)
 void gettempLM35()
 //================================================
 {
-  tempLM35 = (float)(analogRead(micro)) / 1023 * 3300;
+  tempLM35 = (float)(analogRead(micro)) / 1023 * 3300;// 3.3 V pour arduino pro 3.3V
   tempLM35 /= 10.0; // conversion mill en °C
 }
 
@@ -226,6 +247,10 @@ void setup(void)
   }
   date_min = 0;
   //Serial.println("initialization done.");
+//      Wire.begin();
+
+//  rtc.set(0, 42, 16, 6, 2, 5, 15);
+
 }
 
 /*
@@ -248,7 +273,24 @@ void loop(void)
     lasttime = currenttime;
     clocktick( date_jrs, date_hrs, date_min, date_sec);
     sprintf(unit_time, "%02d:%02d:%02d", date_hrs, date_min, date_sec);
+  /*rtc.refresh();
+       sprintf(unit_time, "%02d:%02d:%02d", rtc.hour(), rtc.minute(), rtc.second());
+*/
+    /*
+      tmElements_t tm;
+      if (RTC.read(tm)) {
+        sprintf(unit_time, "%02d:%02d:%02d", tm.Hour, tm.Minute, tm.Second);
+      }
+      else {
+        if (RTC.chipPresent()) {// carte sans setup
+         sprintf(unit_time,"%s",'no setup');
+         }
+        else { // carte no connectee
+         sprintf(unit_time,"%s",'bad connexion');
 
+        }
+      }
+    */
     gettempLM35();
 
     sensors.requestTemperatures(); // Send the command to get temperatures
@@ -328,7 +370,7 @@ void loop(void)
           u8g2.drawStr(50, 50, "/!\\ init");
         }
       }
-      else if (current_selection == nbsensors + 3){
+      else if (current_selection == nbsensors + 3) {
         u8g2.drawStr(0, 0, "");
       }
       else {

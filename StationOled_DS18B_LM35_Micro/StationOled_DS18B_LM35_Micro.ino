@@ -1,13 +1,15 @@
 #include <U8g2lib.h>
 #include <SdFat.h>
-//#include <OneWire.h>
-//#include <DallasTemperature.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 #include <Wire.h>
 #include "RTClib.h"
 
+//---------------- RTC MODULE
 DS1307 rtc;
-
+DateTime now;
+DateTime before;
 //----------------Carte SD
 SdFat sd;
 #define PINSD 10  //pin de l'Arduino reliee au CS du module SD
@@ -17,42 +19,51 @@ SdFat sd;
 // Data wire is plugged into port 2 on the Arduino
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 // Pass our oneWire reference to Dallas Temperature.
-/*
+
 #define ONE_WIRE_BUS 2
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
-*/
+
 //---------------- OLED SCREEN
-U8G2_SSD1306_128X64_NONAME_1_SW_I2C u8g2(U8G2_R0, SCL, SDA, U8X8_PIN_NONE);   // All Boards without Reset of the Display
+U8G2_SSD1306_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, SCL, SDA, U8X8_PIN_NONE);   // All Boards without Reset of the Display
 #define BUTTON_NEXT 3
 #define BUTTON_SELECT 4
 #define HEIGHT     64
 #define WIDTH      128
 #define debounce  250
 
-//---------------- RTS MODULE
-//uRTCLib rtc(0x68);
-//tmElements_t tm;
+#define bitmap_width 8
+#define bitmap_height 12
 
-/*
-  const char *monthName[12] = {
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-  };
-*/
+static unsigned char sd_card_bits[] = {
+  0x3f, 0x55, 0x81, 0x81, 0xbd, 0xa5, 0xa5, 0xa5, 0xbd, 0x81, 0x81, 0xff
+};
+
+static unsigned char sd_card_warning_bits[] = {
+  0x3f, 0x55, 0x81, 0x99, 0x99, 0x99, 0x99, 0x99, 0x81, 0x99, 0x81, 0xff
+};
+
+static unsigned char file_enreg_bits[] = {
+  0x18, 0x18, 0x18, 0x7e, 0x3c, 0x18, 0x7e, 0x00, 0x7e, 0x00, 0x7e, 0x00
+};
+static unsigned char degre_celsius_bits[] = {
+  0x00, 0x00, 0x0e, 0x0a, 0x0e, 0x00, 0x70, 0x10, 0x10, 0x10, 0x70, 0x00
+};
 
 
-byte date_sec = 0;
+
+//byte date_sec = 0;
 byte date_min = 0;
-byte date_hrs = 0;
-byte date_jrs = 0;
+//byte date_hrs = 0;
+//byte date_jrs = 0;
 long lasttime = 0;
 byte lastminute;
 
 char unit_time[] = "23:59:59";
+char unit_date[] = "23/08/2020";
 
 byte nbsensors = 0; // nb de capteurs detectes
-//DeviceAddress AddressSensors[1];
+DeviceAddress AddressSensors[3];
 byte index = 0;
 long nbEnreg = 0;
 char FileSD[] = "REC01.txt";
@@ -67,13 +78,6 @@ const char *string_list_var_0 =
   "File";
 const char *string_list_var_1 =
   "Temp 1\n"
-  "LM35 \n"
-  "Synth \n"
-  "Sleep \n"
-  "File";
-const char *string_list_var_2 =
-  "Temp 1\n"
-  "Temp 2\n"
   "LM35 \n"
   "Synth \n"
   "Sleep \n"
@@ -117,6 +121,25 @@ void draw(float value, byte index = 0)
   txt[8] = 48 + index;
   u8g2.drawStr(0, 0, txt);
   u8g2.drawStr(0, 50, unit_time);
+  u8g2.drawStr(WIDTH - u8g2.getStrWidth(unit_date), 50, unit_date);
+}
+
+//================================================
+void drawClock()
+//================================================
+{
+  u8g2.setFont(u8g2_font_fub17_tn);
+  u8g2.setFontPosTop();
+
+  byte h1 = u8g2.getAscent();
+  byte h_txt = (HEIGHT - h1) >> 1;//division par 2
+  byte w_txt = (WIDTH - u8g2.getStrWidth(unit_time)) >> 1;//division par 2
+
+  u8g2.drawStr( w_txt, h_txt, unit_time);
+
+  u8g2.setFont(u8g2_font_6x12_tr);
+  w_txt = (WIDTH - u8g2.getStrWidth(unit_date)) >> 1;//division par 2
+  u8g2.drawStr( w_txt, h_txt + 18, unit_date);
 }
 
 //================================================
@@ -214,19 +237,34 @@ void setup(void)
   pinMode(PINCARD, INPUT_PULLUP);
   //Serial.begin(9600);
 
+
+
   //----------------------------------------- detection du nombre de capteurs
-/*  sensors.begin();
+  sensors.begin();
   nbsensors = sensors.getDeviceCount();
   for (byte i = 0; i < nbsensors; i++) {
     sensors.getAddress(AddressSensors[i], i);
   }
-*/
+
   //----------------------------------------- boutons du graphique
+  // u8g2.setI2CAddress(0x78);
   u8g2.begin(/*Select=*/ BUTTON_SELECT, /*Right/Next=*/ BUTTON_NEXT, /*Left/Prev=*/ U8X8_PIN_NONE, /*Up=*/ U8X8_PIN_NONE, /*Down=*/ U8X8_PIN_NONE, /*Home/Cancel=*/ U8X8_PIN_NONE);
   u8g2.setFontRefHeightExtendedText();
   u8g2.setDrawColor(1);
   u8g2.setFontPosTop();
   u8g2.setFontDirection(0);
+
+  Wire.begin();
+
+  rtc.begin();
+
+  if (! rtc.isrunning()) {
+    //Serial.println("RTC is NOT running!");
+    // following line sets the RTC to the date & time this sketch was compiled
+    rtc.adjust(DateTime(__DATE__, __TIME__));
+  }
+  //Wire.end();
+  delay (2000);
 
   //----------------------------------------- detection de la carte SD
   // ajouter fct pour changer le nomero du fichier si existe deja un fichier
@@ -245,22 +283,11 @@ void setup(void)
     FileSD[4] = index % 10 + 48;
     index++;
   }
-  date_min = 0;
+  //now = rtc.now();
+  before = rtc.now();
+  date_min = now.minute();
+  lastminute = date_min;
   //Serial.println("initialization done.");
-//delay (2000);
-  bool parse=false;
-  bool config=false;
-
-  // get the date and time the compiler was run
-/*  if (getDate(__DATE__) && getTime(__TIME__)) {
-    parse = true;
-    // and configure the RTC with this info
-    if (RTC.write(tm)) {
-      config = true;
-    }
-  }
-*/
-delay (200);
 
 }
 
@@ -272,46 +299,34 @@ void loop(void)
 //================================================
 {
   unsigned long currenttime = millis();
-  float temp[3];
+  float temp[1];
   int8_t bouton = u8g2.getMenuEvent();
   byte cardOK = digitalRead(PINCARD);
+
 
   if (cardOK == LOW) {
     cartepresente = 0;// la carte a ete retiree pas d'ecriture
   }
 
-  if ( (unsigned long)(currenttime - lasttime) >= 1000 ) {// toutes les 2 secondes
-    lasttime = currenttime;
-    clocktick( date_jrs, date_hrs, date_min, date_sec);
-    sprintf(unit_time, "%02d:%02d:%02d", date_hrs, date_min, date_sec);
-  if (RTC.read(tm)) {
-       sprintf(unit_time, "%02d:%02d:%02d", 10, 20, 30);
-  }
-    /*
-      tmElements_t tm;
-      if (RTC.read(tm)) {
-        sprintf(unit_time, "%02d:%02d:%02d", tm.Hour, tm.Minute, tm.Second);
-      }
-      else {
-        if (RTC.chipPresent()) {// carte sans setup
-         sprintf(unit_time,"%s",'no setup');
-         }
-        else { // carte no connectee
-         sprintf(unit_time,"%s",'bad connexion');
+  //DateTime
+  now = rtc.now();
+  date_min = now.minute();
+   gettempLM35();
 
-        }
-      }
-    */
-    gettempLM35();
-
- /*   sensors.requestTemperatures(); // Send the command to get temperatures
+    sensors.requestTemperatures(); // Send the command to get temperatures
     for (byte i = 0; i < nbsensors; i++) {
       temp[i] = sensors.getTempC(AddressSensors[i]);
     }
-*/
-    String txtsd = unit_time;
+
+  if ( now.unixtime() > before.unixtime()) { // toutes les 2 secondes
+    before = rtc.now();
+    sprintf(unit_time, "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
+    sprintf(unit_date, "%02d/%02d/%04d", now.day(), now.month(), now.year());
+
+ 
+    String txtsd = unit_date;
+    txtsd = txtsd + "," + unit_time ;
     txtsd = txtsd + "," + printfloat2char(temp[0]) ;
-    //    txtsd = txtsd + "," + printfloat2char(temp[1]) ;
     txtsd = txtsd + "," + printfloat2char(tempLM35) ;
 
 
@@ -328,6 +343,7 @@ void loop(void)
 
       writeFile(txtsd);
     }
+
   }
 
 
@@ -341,9 +357,6 @@ void loop(void)
       case 1:
         current_selection = u8g2.userInterfaceSelectionList("Mesures", current_selection, string_list_var_1);
         break;
-      case 2:
-        current_selection = u8g2.userInterfaceSelectionList("Mesures", current_selection, string_list_var_2);
-        break;
       default:
         break;
     }
@@ -353,6 +366,7 @@ void loop(void)
     // picture loop
     u8g2.firstPage();
     do {
+
       if (current_selection <= nbsensors) {
         //--------------------------------- page de chaque CAPTEUR
         draw(temp[current_selection - 1 ], current_selection);
@@ -361,25 +375,29 @@ void loop(void)
         draw(tempLM35, current_selection);
       }
       else if (current_selection == nbsensors + 2) {
+        drawClock();
         u8g2.setFont(u8g2_font_6x12_tr);
         u8g2.setFontPosTop();
         u8g2.drawStr( 0, 0, printfloat2char(temp[0]));
-        if (nbsensors == 2) {
-          u8g2.drawStr(64, 0, printfloat2char(temp[1]));
-        }
-        u8g2.drawStr( 0, 12, printfloat2char(tempLM35));
-        u8g2.drawStr(0, 20, unit_time);
-        char txt[] = "Enreg#######";
-        sprintf(txt, "Enreg# %d", nbEnreg);
-        u8g2.drawStr(0, 30, txt);
+        u8g2.drawXBM( u8g2.getStrWidth(printfloat2char(temp[0])), 0, bitmap_width, bitmap_height, degre_celsius_bits);
+        u8g2.drawStr( WIDTH - u8g2.getStrWidth(printfloat2char(tempLM35)) - 8, 0, printfloat2char(tempLM35));
+        u8g2.drawXBM( WIDTH - 8 , 0, bitmap_width, bitmap_height, degre_celsius_bits);
 
-        u8g2.drawStr(0, 40, FileSD);
+        char txt[] = "# 10000";
+        sprintf(txt, "#%d", nbEnreg);
+        byte l1 = u8g2.getStrWidth(txt);
+
+        u8g2.drawStr(WIDTH - l1, 54, txt);
 
         byte cardOK = digitalRead(PINCARD);
-        u8g2.drawStr(30, 52, (cardOK == LOW) ? "No CARD !" : "Card OK");
-        if (cartepresente == 0) {
-          u8g2.drawStr(50, 50, "/!\\ init");
+        if (cardOK == LOW) {
+          u8g2.drawXBM(0, HEIGHT - bitmap_height, bitmap_width, bitmap_height, sd_card_warning_bits );
+        } else {
+          u8g2.drawXBM(0, HEIGHT - bitmap_height, bitmap_width, bitmap_height, sd_card_bits);
+          u8g2.drawXBM(12, HEIGHT - bitmap_height, bitmap_width, bitmap_height, file_enreg_bits);
+          u8g2.drawStr(12 + bitmap_width + 8 , 54, FileSD);
         }
+
       }
       else if (current_selection == nbsensors + 3) {
         u8g2.drawStr(0, 0, "");

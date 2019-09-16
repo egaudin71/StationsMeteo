@@ -8,8 +8,8 @@
 
 //---------------- RTC MODULE
 DS1307 rtc;
-DateTime now;
-DateTime before;
+DateTime date_now;
+DateTime date_before;
 //----------------Carte SD
 SdFat sd;
 #define PINSD 10  //pin de l'Arduino reliee au CS du module SD
@@ -47,23 +47,18 @@ static unsigned char file_enreg_bits[] = {
   0x18, 0x18, 0x18, 0x7e, 0x3c, 0x18, 0x7e, 0x00, 0x7e, 0x00, 0x7e, 0x00
 };
 static unsigned char degre_celsius_bits[] = {
-  0x00, 0x00, 0x0e, 0x0a, 0x0e, 0x00, 0x70, 0x10, 0x10, 0x10, 0x70, 0x00
+  0x00, 0x00, 0x0e, 0x0a, 0xee, 0x20, 0x20, 0x20, 0xe0, 0x00, 0x00, 0x00
+};
+static unsigned char thermo_bits[] = {
+  0x18, 0x24, 0x34, 0x24, 0x34, 0x24, 0x34, 0x24, 0x3c, 0x7e, 0x7e, 0x3c
 };
 
-
-
-//byte date_sec = 0;
-byte date_min = 0;
-//byte date_hrs = 0;
-//byte date_jrs = 0;
-long lasttime = 0;
-byte lastminute;
 
 char unit_time[] = "23:59:59";
 char unit_date[] = "23/08/2020";
 
 byte nbsensors = 0; // nb de capteurs detectes
-DeviceAddress AddressSensors[3];
+DeviceAddress AddressSensors[1];
 byte index = 0;
 long nbEnreg = 0;
 char FileSD[] = "REC01.txt";
@@ -117,9 +112,12 @@ void draw(float value, byte index = 0)
   u8g2.drawStr( w_txt, h_txt, printfloat2char(value));
 
   u8g2.setFont(u8g2_font_6x12_tr);
-  char txt[] = "CAPTEUR 9";
-  txt[8] = 48 + index;
-  u8g2.drawStr(0, 0, txt);
+  char txt[] = " 9";
+  txt[1] = 48 + index;
+//char txt='9';
+  //txt = 48 + 0;
+ u8g2.drawStr(0, 0, txt);
+ u8g2.drawXBM( 16, 0, bitmap_width, bitmap_height, thermo_bits);
   u8g2.drawStr(0, 50, unit_time);
   u8g2.drawStr(WIDTH - u8g2.getStrWidth(unit_date), 50, unit_date);
 }
@@ -264,7 +262,7 @@ void setup(void)
     rtc.adjust(DateTime(__DATE__, __TIME__));
   }
   //Wire.end();
-  delay (2000);
+  delay (1000);
 
   //----------------------------------------- detection de la carte SD
   // ajouter fct pour changer le nomero du fichier si existe deja un fichier
@@ -284,9 +282,9 @@ void setup(void)
     index++;
   }
   //now = rtc.now();
-  before = rtc.now();
-  date_min = now.minute();
-  lastminute = date_min;
+  date_before = rtc.now();
+  //  date_min = now.minute();
+  //  lastminute = date_min;
   //Serial.println("initialization done.");
 
 }
@@ -298,7 +296,7 @@ void setup(void)
 void loop(void)
 //================================================
 {
-  unsigned long currenttime = millis();
+  //unsigned long currenttime = millis();
   float temp[1];
   int8_t bouton = u8g2.getMenuEvent();
   byte cardOK = digitalRead(PINCARD);
@@ -309,29 +307,28 @@ void loop(void)
   }
 
   //DateTime
-  now = rtc.now();
-  date_min = now.minute();
-   gettempLM35();
+  date_now = rtc.now(); //recuperation date du RTC
 
-    sensors.requestTemperatures(); // Send the command to get temperatures
-    for (byte i = 0; i < nbsensors; i++) {
-      temp[i] = sensors.getTempC(AddressSensors[i]);
-    }
+  gettempLM35();
 
-  if ( now.unixtime() > before.unixtime()) { // toutes les 2 secondes
-    before = rtc.now();
-    sprintf(unit_time, "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
-    sprintf(unit_date, "%02d/%02d/%04d", now.day(), now.month(), now.year());
+  sensors.requestTemperatures(); // Send the command to get temperatures
+  for (byte i = 0; i < nbsensors; i++) {
+    temp[i] = sensors.getTempC(AddressSensors[i]);
+  }
 
- 
+  if ( date_now.unixtime() > date_before.unixtime()) { // toutes les 2 secondes
+    date_before = date_now;
+    sprintf(unit_time, "%02d:%02d:%02d", date_now.hour(), date_now.minute(), date_now.second());
+    sprintf(unit_date, "%02d/%02d/%04d", date_now.day(), date_now.month(), date_now.year());
+
+
     String txtsd = unit_date;
     txtsd = txtsd + "," + unit_time ;
     txtsd = txtsd + "," + printfloat2char(temp[0]) ;
     txtsd = txtsd + "," + printfloat2char(tempLM35) ;
 
 
-    if ( (date_min != lastminute) && (date_min % 2 == 0)) { // toutes les 1 minutes
-      lastminute = date_min;
+    if ( (date_now.minute() != date_before.minute()) && (date_now.minute() % 2 == 0)) { // toutes les 2 minutes
 
       if ((cartepresente == 0) && (cardOK == HIGH)) { // la carte avait ete enlevee, elle est remise
         cartepresente = 1;// reactive la communication

@@ -114,10 +114,10 @@ void draw(float value, byte index = 0)
   u8g2.setFont(u8g2_font_6x12_tr);
   char txt[] = " 9";
   txt[1] = 48 + index;
-//char txt='9';
+  //char txt='9';
   //txt = 48 + 0;
- u8g2.drawStr(0, 0, txt);
- u8g2.drawXBM( 16, 0, bitmap_width, bitmap_height, thermo_bits);
+  u8g2.drawStr(0, 0, txt);
+  u8g2.drawXBM( 16, 0, bitmap_width, bitmap_height, thermo_bits);
   u8g2.drawStr(0, 50, unit_time);
   u8g2.drawStr(WIDTH - u8g2.getStrWidth(unit_date), 50, unit_date);
 }
@@ -233,7 +233,7 @@ void setup(void)
   attachInterrupt(1, change_page, HIGH);
   pinMode(3, INPUT_PULLUP);
   pinMode(PINCARD, INPUT_PULLUP);
-  //Serial.begin(9600);
+//  Serial.begin(9600);
 
 
 
@@ -253,7 +253,6 @@ void setup(void)
   u8g2.setFontDirection(0);
 
   Wire.begin();
-
   rtc.begin();
 
   if (! rtc.isrunning()) {
@@ -261,12 +260,10 @@ void setup(void)
     // following line sets the RTC to the date & time this sketch was compiled
     rtc.adjust(DateTime(__DATE__, __TIME__));
   }
-  //Wire.end();
   delay (1000);
 
   //----------------------------------------- detection de la carte SD
-  // ajouter fct pour changer le nomero du fichier si existe deja un fichier
-
+  
   if (!sd.begin(PINSD)) {
     //Serial.println("initialization failed!");
     cartepresente = 0;
@@ -281,10 +278,8 @@ void setup(void)
     FileSD[4] = index % 10 + 48;
     index++;
   }
-  //now = rtc.now();
+
   date_before = rtc.now();
-  //  date_min = now.minute();
-  //  lastminute = date_min;
   //Serial.println("initialization done.");
 
 }
@@ -317,16 +312,13 @@ void loop(void)
   }
 
   if ( date_now.unixtime() > date_before.unixtime()) { // toutes les 2 secondes
-    date_before = date_now;
     sprintf(unit_time, "%02d:%02d:%02d", date_now.hour(), date_now.minute(), date_now.second());
     sprintf(unit_date, "%02d/%02d/%04d", date_now.day(), date_now.month(), date_now.year());
-
 
     String txtsd = unit_date;
     txtsd = txtsd + "," + unit_time ;
     txtsd = txtsd + "," + printfloat2char(temp[0]) ;
     txtsd = txtsd + "," + printfloat2char(tempLM35) ;
-
 
     if ( (date_now.minute() != date_before.minute()) && (date_now.minute() % 2 == 0)) { // toutes les 2 minutes
 
@@ -340,6 +332,7 @@ void loop(void)
 
       writeFile(txtsd);
     }
+    date_before = date_now;
 
   }
 
@@ -396,7 +389,7 @@ void loop(void)
         }
 
       }
-      else if (current_selection == nbsensors + 3) {
+      else if (current_selection == nbsensors + 3) {// sleeping screen with no light
         u8g2.drawStr(0, 0, "");
       }
       else {

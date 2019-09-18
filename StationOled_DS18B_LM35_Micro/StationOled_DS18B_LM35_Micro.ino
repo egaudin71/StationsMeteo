@@ -254,13 +254,14 @@ void setup(void)
 
   Wire.begin();
   rtc.begin();
-
+/*
   if (! rtc.isrunning()) {
     //Serial.println("RTC is NOT running!");
     // following line sets the RTC to the date & time this sketch was compiled
     rtc.adjust(DateTime(__DATE__, __TIME__));
   }
-  delay (1000);
+  */
+  delay (2000);
 
   //----------------------------------------- detection de la carte SD
   
